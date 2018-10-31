@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+# created by Derric Lyns (derriclyns@gnail.com)
+# this file generates formatted code using astyle
+# use this file to format code before checkin in the code
+#
+# default style=allman
+#
+# the file can also feature git add
+#
+
+STYLE=allman
+SRC_DIR=src
+ASTYLE_APP="astyle"
+BCK=".orig"
+count=0
+index=0
+version_num=0
+
+
+function format_sources(){
+
+    echo "-formatting sources"
+    #get all files
+    FILES=`git diff --name-only ':(exclude)*.sh'`
+
+    if [ -z "${FILES}" ];then
+        echo "-no change detected"
+    else
+        astyle --style=${STYLE} ${FILES} --quiet
+        #cleanup
+        for file in $FILES
+        do
+            if [ -f "${file}.orig" ];then
+                echo "-removing $file.orig"
+                rm ${file}.orig
+            else
+                echo "-cannot remove ${file}.orig"
+            fi
+        done
+    fi
+
+    git add ${SRC_DIR}/*.c ${SRC_DIR}/*.h
+
+}
+
+
+# installs astyle from sources
+function install_astyle(){
+    git clone https://github.com/skynetcore/astyle.git
+    cd astyle/build/gcc
+    make
+    sudo make install
+}
+
+
+# checks the version of astyle that contains --style=google, allman
+function check_version(){
+
+    VERSION="$(${ASTYLE_APP} --version)"
+    declare -a VER
+
+    for data in $VERSION
+    do
+        #echo "Data: $data"
+        if [ "$data" = "Version" ];then
+            index=$((count));
+        fi
+        VER[${count}]=$data
+        count=$((count+1))
+    done
+
+    index=$((index+1))
+    version_num=${VER[$index] }
+
+    #echo $version_num
+    if [[ "$version_num" =~ ^[0-9]+(\.[0-9]+)?$ ]];then
+        echo "-astyle is installed"
+        echo "-checking version compatibility"
+    if (( $(echo "$version_num > 3.0" | bc -l) )) ;then
+            echo "-compatible astyle version detected"
+    else
+            echo "-astyle version incompatible. upgrading to astyle 3.1 or above"
+        install_astyle
+        fi
+    else
+        echo "-astyle is not installed. Installing astyle. need not answer [y/n]"
+        install_astyle
+    fi
+}
+
+#check for astyle
+check_version
+#format
+format_sources
+
+#comment the below once dry run is done, uncomment for dry run
+#exit 1
+
+exit 0
